@@ -1,3 +1,5 @@
+import { crearTokenDeAcceso } from "../libs/jwt.js";
+import AuditoriaUser from "../models/auditoriaUser.js";
 import User from "../models/user.model.js";
 import bcrypt from 'bcryptjs'
 
@@ -15,7 +17,7 @@ export const listarUsuarios = async (req, res) => {
 export const listarUsuariosPorNombre = async (req, res) => {
 
     const { busquedaNombre } = req.query;
-    
+
     try {
         const listadoUsuarios = await User.find({ nombre: { $regex: busquedaNombre, $options: 'i' }, estado: true });
         res.status(200).json(listadoUsuarios)
@@ -60,9 +62,9 @@ export const crearUsuario = async (req, res) => {
 
 export const modificarUsuario = async (req, res) => {
     const { id } = req.params;
-    const { nombre, email, nuevaPassword, rol } = req.body;
+    const { nombre, email, nuevaPassword, rol, estado } = req.body;
 
-    if (!nombre || !email || !rol) {
+    if (!nombre || !email || !rol || !estado) {
         return res.status(400).json({ message: "Error: debe completar los campos obligatorios." })
     }
     try {
@@ -74,11 +76,11 @@ export const modificarUsuario = async (req, res) => {
         if (nuevaPassword) {
             let hashPassword = await bcrypt.hash(nuevaPassword, 10)
             modificacionesUser = {
-                nombre, email, password: hashPassword, rol
+                nombre, email, password: hashPassword, estado, rol
             }
         } else {
             modificacionesUser = {
-                nombre, email, password: user.password, rol
+                nombre, email, password: user.password, estado, rol
             }
         }
 
@@ -94,12 +96,56 @@ export const modificarUsuario = async (req, res) => {
 
 export const eliminarUsuario = async (req, res) => {
     const { id } = req.params;
+    const idAdmin = req.usuario.id
     try {
+
         const userEliminado = await User.findByIdAndUpdate(id, { estado: false }, { new: true });
         if (!userEliminado) return res.status(404).json({ message: "Error: el id ingresado no pertenece a un usuario." })
+
+        const auditoria = new AuditoriaUser({
+            observacion: "Usuario eliminado desde el panel de control",
+            idUser: id,
+            idAdmin
+        })
+        const auditoriaRegistrada = await auditoria.save();
+
         res.status(200).json(userEliminado)
     } catch (error) {
+        console.log(error);
+
         res.status(500).json({ message: "Error: hubo un error al intentar eliminar el usuario seleccionado." })
 
     }
+}
+
+
+export const loginUsuario = async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ message: "Error: debe completar los campos obligatorios." })
+    }
+
+    try {
+        // buscar el usuario por el email ingresado
+        const usuarioEncontrado = await User.findOne({ email })
+        if (!usuarioEncontrado) return res.status(400).json({ message: "El email ingresado no está registrado." })
+
+        const passValida = await bcrypt.compare(password, usuarioEncontrado.password)
+        if (!passValida) return res.status(400).json({ message: "Contraseña incorrecta." })
+
+        const token = await crearTokenDeAcceso({ id: usuarioEncontrado._id, nombre: usuarioEncontrado.nombre, rol: usuarioEncontrado.rol });
+        res.cookie('token', token)
+
+        res.json({ id: usuarioEncontrado._id, nombre: usuarioEncontrado.nombre, rol: usuarioEncontrado.rol })
+    } catch (error) {
+        console.log(error);
+
+        res.status(500).json({ message: error })
+    }
+
+}
+
+export const logout = (req, res) => {
+    res.clearCookie('token')
+    return res.sendStatus(200)
 }

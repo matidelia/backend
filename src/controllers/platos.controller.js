@@ -1,3 +1,4 @@
+import AuditoriaPlato from "../models/auditoriaPlato.js";
 import Plato from "../models/plato.model.js"
 
 
@@ -17,7 +18,7 @@ export const listarPlatos = async (req, res) => {
 export const listarPlatosPorCategoria = async (req, res) => {
     const { categoria } = req.params;
     try {
-        const listadoPlatos = await Plato.find({ categoria, estado: true});
+        const listadoPlatos = await Plato.find({ categoria, estado: true });
         res.status(200).json(listadoPlatos)
 
     } catch (error) {
@@ -90,9 +91,18 @@ export const modificarPlato = async (req, res) => {
 
 export const eliminarPlato = async (req, res) => {
     const { id } = req.params;
+    const idAdmin = req.usuario.id
     try {
-        const platoEliminado = await Plato.findByIdAndUpdate(id, {estado:false}, { new: true });
+        const platoEliminado = await Plato.findByIdAndUpdate(id, { estado: false }, { new: true });
         if (!platoEliminado) return res.status(404).json({ message: "Error: el id ingresado no pertenece a un plato." })
+        const auditoria = new AuditoriaPlato({
+            observacion: "Plato eliminado desde el panel de control",
+            idPlato: id,
+            idAdmin
+        })
+        const auditoriaRegistrada = await auditoria.save();
+        console.log(auditoriaRegistrada);
+
         res.status(200).json(platoEliminado)
     } catch (error) {
         res.status(500).json({ message: "Error: hubo un error al intentar eliminar el plato seleccionado." })
