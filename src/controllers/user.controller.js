@@ -1,4 +1,5 @@
-import { crearTokenDeAcceso } from "../libs/jwt.js";
+import jwt from "jsonwebtoken";
+import { crearTokenDeAcceso, TOKEN_SECRET } from "../libs/jwt.js";
 import AuditoriaUser from "../models/auditoriaUser.js";
 import User from "../models/user.model.js";
 import bcrypt from 'bcryptjs'
@@ -14,6 +15,17 @@ export const listarUsuarios = async (req, res) => {
 
     }
 }
+export const listarUsuarioPorID = async (req, res) => {
+    const { id } = req.params
+    try {
+        const dataUsuario = await User.findById(id);
+        res.status(200).json(dataUsuario)
+
+    } catch (error) {
+        res.status(500).json({ message: "Error: hubo un error al intentar acceder al detalle de usuarios." })
+
+    }
+}
 export const listarUsuariosPorNombre = async (req, res) => {
 
     const { busquedaNombre } = req.query;
@@ -23,7 +35,7 @@ export const listarUsuariosPorNombre = async (req, res) => {
         res.status(200).json(listadoUsuarios)
 
     } catch (error) {
-        res.status(500).json({ message: "Error: hubo un error al intentar acceder al listado de platos." })
+        res.status(500).json({ message: "Error: hubo un error al intentar acceder al listado de usuarios." })
 
     }
 }
@@ -109,7 +121,7 @@ export const eliminarUsuario = async (req, res) => {
         })
         const auditoriaRegistrada = await auditoria.save();
 
-        res.status(200).json(userEliminado)
+        res.status(204).json(userEliminado)
     } catch (error) {
         console.log(error);
 
@@ -148,4 +160,16 @@ export const loginUsuario = async (req, res) => {
 export const logout = (req, res) => {
     res.clearCookie('token')
     return res.sendStatus(200)
+}
+
+export const verificarLogin = (req, res) => {
+    const { token } = req.body;
+    if (!token) return res.status(401).json({ message: "Usuario no está logeado" })
+    jwt.verify(token, TOKEN_SECRET, async (err, user) => {
+        if (err) return res.status(401).json({ message: "Token no válido" })
+        const userFound = await User.findById(user.id);
+        if (!userFound) return res.status(401).json({ message: "El usuario no está registrado" })
+
+        return res.status(200).json({ id: userFound._id, nombre: userFound.nombre, email: userFound.email, rol: userFound.rol })
+    })
 }
