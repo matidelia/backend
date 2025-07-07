@@ -18,7 +18,7 @@ router.get('/platos', listarPlatos)
 router.get('/platos/categorias', listarCategoriasPlatos)
 router.get('/plato/:id', listarPlatoPorID)
 router.get('/platos/principales', listarPlatosPrincipales)
-router.get('/platos/:categoria', listarPlatosPorCategoria)
+router.get('/platos/categoria/:categoria', listarPlatosPorCategoria)
 
 
 router.post('/platos', authRequerida, adminRequerido, upload.single('portada'), crearPlato)
